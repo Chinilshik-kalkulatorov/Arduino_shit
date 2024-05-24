@@ -1,97 +1,176 @@
-#include <Servo.h>
+//ARDUINO OBSTACLE AVOIDING CAR//
+// Before uploading the code you have to install the necessary library//
+//AFMotor Library https://learn.adafruit.com/adafruit-motor-shield/library-install //
+//NewPing Library https://github.com/livetronic/Arduino-NewPing// 
+//Servo Library https://github.com/arduino-libraries/Servo.git //
+// To Install the libraries go to sketch >> Include Library >> Add .ZIP File >> Select the Downloaded ZIP files From the Above links //
 
-// Define pin connections
-const int motorPins[4][2] = {{4, 7}, {2, 3}};
-const int enablePins[2] = {9, 10};
-const int servoPin = 12, irPin = 11, trigPin = 8, echoPin = 6, buzzerPin = A1;
 
-Servo servoMotor;
-unsigned long previousMillis = 0;  // to manage timing without delay
-const long interval = 300;         // interval at which to scan (milliseconds)
+#include <AFMotor.h>  
+#include <NewPing.h>
+#include <Servo.h> 
 
-// Function prototypes
-void drive(int speed, bool forward);
-void stopMotors();
-void beep(int count, int toneFreq, int duration);
-void scanAndCheckObstacles();
-long measureDistance();
+#define TRIG_PIN A0 
+#define ECHO_PIN A1 
+#define MAX_DISTANCE 200 
+#define MAX_SPEED 250 // sets speed of DC  motors
+#define MAX_SPEED_OFFSET 20
+
+NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE); 
+
+AF_DCMotor motor1(1, MOTOR12_1KHZ); 
+AF_DCMotor motor2(2, MOTOR12_1KHZ);
+AF_DCMotor motor3(3, MOTOR34_1KHZ);
+AF_DCMotor motor4(4, MOTOR34_1KHZ);
+Servo myservo;   
+
+boolean goesForward=false;
+int distance = 100;
+int speedSet = 0;
 
 void setup() {
-  for (auto &pinPair : motorPins) {
-    pinMode(pinPair[0], OUTPUT);
-    pinMode(pinPair[1], OUTPUT);
-  }
-  for (int pin : enablePins) pinMode(pin, OUTPUT);
-  pinMode(irPin, INPUT);
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  pinMode(buzzerPin, OUTPUT);
-  servoMotor.attach(servoPin);
-  Serial.begin(9600);
-  beep(3, 1000, 100);
+
+  myservo.attach(10);  
+  myservo.write(115); 
+  delay(1000);
+  distance = readPing();
+  delay(100);
+  distance = readPing();
+  delay(100);
+  distance = readPing();
+  delay(100);
+  distance = readPing();
+  delay(100);
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
+ int distanceR = 0;
+ int distanceL =  0;
+ delay(40);
+ 
+ if(distance<=15)
+ {
+  moveStop();
+  delay(100);
+  moveBackward();
+  delay(300);
+  moveStop();
+  delay(200);
+  distanceR = lookRight();
+  delay(200);
+  distanceL = lookLeft();
+  delay(200);
 
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    scanAndCheckObstacles();
+  if(distanceR>=distanceL)
+  {
+    turnRight();
+    moveStop();
+  }else
+  {
+    turnLeft();
+    moveStop();
+  }
+ }else
+ {
+  moveForward();
+ }
+ distance = readPing();
+}
+
+int lookRight()
+{
+    myservo.write(50); 
+    delay(500);
+    int distance = readPing();
+    delay(100);
+    myservo.write(115); 
+    return distance;
+}
+
+int lookLeft()
+{
+    myservo.write(170); 
+    delay(500);
+    int distance = readPing();
+    delay(100);
+    myservo.write(115); 
+    return distance;
+    delay(100);
+}
+
+int readPing() { 
+  delay(70);
+  int cm = sonar.ping_cm();
+  if(cm==0)
+  {
+    cm = 250;
+  }
+  return cm;
+}
+
+void moveStop() {
+  motor1.run(RELEASE); 
+  motor2.run(RELEASE);
+  motor3.run(RELEASE);
+  motor4.run(RELEASE);
+  } 
+  
+void moveForward() {
+
+ if(!goesForward)
+  {
+    goesForward=true;
+    motor1.run(FORWARD);      
+    motor2.run(FORWARD);
+    motor3.run(FORWARD); 
+    motor4.run(FORWARD);     
+   for (speedSet = 0; speedSet < MAX_SPEED; speedSet +=2) // slowly bring the speed up to avoid loading down the batteries too quickly
+   {
+    motor1.setSpeed(speedSet);
+    motor2.setSpeed(speedSet);
+    motor3.setSpeed(speedSet);
+    motor4.setSpeed(speedSet);
+    delay(5);
+   }
   }
 }
 
-void scanAndCheckObstacles() {
-  static int angle = 0;
-  static bool increasing = true;
-
-  servoMotor.write(angle);
-  if (increasing) {
-    angle += 30;
-    if (angle >= 180) increasing = false;
-  } else {
-    angle -= 30;
-    if (angle <= 0) increasing = true;
+void moveBackward() {
+    goesForward=false;
+    motor1.run(BACKWARD);      
+    motor2.run(BACKWARD);
+    motor3.run(BACKWARD);
+    motor4.run(BACKWARD);  
+  for (speedSet = 0; speedSet < MAX_SPEED; speedSet +=2) // slowly bring the speed up to avoid loading down the batteries too quickly
+  {
+    motor1.setSpeed(speedSet);
+    motor2.setSpeed(speedSet);
+    motor3.setSpeed(speedSet);
+    motor4.setSpeed(speedSet);
+    delay(5);
   }
+}  
 
-  long distance = measureDistance();
-  if (digitalRead(irPin) == LOW || distance < 20) {
-    Serial.println("Obstacle detected - Stopping");
-    beep(1, 2000, 500);
-    stopMotors();
-    drive(-150, false);
-    delay(1500);
-    stopMotors();
-  } else {
-    drive(255, true);
-  }
-}
-
-long measureDistance() {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  return pulseIn(echoPin, HIGH) * 0.034 / 2;
-}
-
-void drive(int speed, bool forward) {
-  int directionMult = forward ? HIGH : LOW;
-  for (int i = 0; i < 2; i++) {
-    analogWrite(enablePins[i], abs(speed));
-    digitalWrite(motorPins[i][0], directionMult);
-    digitalWrite(motorPins[i][1], !directionMult);
-  }
-}
-
-void stopMotors() {
-  for (int pin : enablePins) analogWrite(pin, 0);
-}
-
-void beep(int count, int toneFreq, int duration) {
-  for (int i = 0; i < count; i++) {
-    tone(buzzerPin, toneFreq, duration);
-    delay(duration + 100);
-    noTone(buzzerPin);
-  }
+void turnRight() {
+  motor1.run(FORWARD);
+  motor2.run(FORWARD);
+  motor3.run(BACKWARD);
+  motor4.run(BACKWARD);     
+  delay(500);
+  motor1.run(FORWARD);      
+  motor2.run(FORWARD);
+  motor3.run(FORWARD);
+  motor4.run(FORWARD);      
+} 
+ 
+void turnLeft() {
+  motor1.run(BACKWARD);     
+  motor2.run(BACKWARD);  
+  motor3.run(FORWARD);
+  motor4.run(FORWARD);   
+  delay(500);
+  motor1.run(FORWARD);     
+  motor2.run(FORWARD);
+  motor3.run(FORWARD);
+  motor4.run(FORWARD);
 }
