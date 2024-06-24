@@ -61,3 +61,10 @@ graph TD;
     I --> D;
     D --> C;
 ```
+
+## Authors
+
+- Bilol
+- Pan
+- Osama
+- Xinrui
