@@ -21,7 +21,7 @@ This project is an Arduino-based robot that uses ultrasonic sensors, infrared se
 ## Installation
 
 1. Connect the components as described in the code.
-2. Upload the `2nd.cpp` file to your Arduino board using the Arduino IDE.
+2. Upload the `Peace.c` file to your Arduino board using the Arduino IDE.
 3. Pair the Bluetooth module with your controlling device if manual control is required.
 
 ## Usage
